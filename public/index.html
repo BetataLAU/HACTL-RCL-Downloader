@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HACTL RCL 自動下載 (PAL)</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>✈ HACTL RCL 自動下載 (PAL)</h1>
+    <div class="status">
+      <span id="status-dot" class="dot idle"></span>
+      <span id="status-text">閒置</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>⚙ 設定</h2>
+      <div class="grid">
+        <label>帳號
+          <input id="s-username" type="text" autocomplete="off" placeholder="HACTL 登入帳號">
+        </label>
+        <label>密碼
+          <input id="s-password" type="password" autocomplete="new-password" placeholder="尚未設定">
+        </label>
+        <label>儲存資料夾
+          <input id="s-saveDir" type="text" placeholder="C:\Users\...\Downloads">
+        </label>
+        <label>預設航空公司
+          <input id="s-airline" type="text" size="4" placeholder="QR">
+        </label>
+        <label class="check">
+          <input id="s-showBrowser" type="checkbox"> 顯示瀏覽器視窗 (可看到自動化過程)
+        </label>
+      </div>
+      <button id="btn-save-settings" class="btn secondary">儲存設定</button>
+      <span id="settings-msg"></span>
+    </section>
+
+    <section class="card">
+      <h2>▶ 執行下載</h2>
+      <div class="grid">
+        <label>Accept Date 由 (格式如 15AUG26)
+          <input id="r-acceptDate" type="text" placeholder="15AUG26">
+        </label>
+        <label>到 (格式如 16AUG26)
+          <input id="r-acceptDateTo" type="text" placeholder="16AUG26">
+        </label>
+        <label>Airline
+          <input id="r-airline" type="text" size="4" placeholder="QR">
+        </label>
+      </div>
+
+      <div class="mawb-block">
+        <h3>MAWB 清單 <span class="hint">(勾選「已下載RCL」= 跳過, 唔檢查; 可由 Excel 直接貼上; 支援 157-53711840 / 157-5371 1840 / 15753711840, 統一顯示 157-5371 1840)</span></h3>
+        <table class="mawb-table">
+          <thead>
+            <tr><th class="col-num">#</th><th class="col-check">已下載RCL</th><th>MAWB#</th><th class="col-del"></th></tr>
+          </thead>
+          <tbody id="mawb-body"></tbody>
+        </table>
+        <div class="mawb-tools">
+          <button id="btn-add-mawb" class="btn secondary small">＋ 加一行</button>
+          <button id="btn-sort-asc" class="btn secondary small">↕ 由小至大</button>
+          <button id="btn-sort-desc" class="btn secondary small">↕ 由大至小</button>
+          <button id="btn-sort-orig" class="btn secondary small">↕ 還原次序</button>
+          <button id="btn-del-invalid" class="btn danger small">✕ 刪除無效 MAWB</button>
+          <button id="btn-clear-mawb" class="btn secondary small">清空清單</button>
+          <span id="mawb-msg"></span>
+        </div>
+      </div>
+
+      <button id="btn-run" class="btn primary">開始下載</button>
+      <button id="btn-stop" class="btn danger" disabled>停止</button>
+      <div class="chips">
+        <span class="chip ok">已下載: <b id="sum-downloaded">0</b></span>
+        <span class="chip mute">已跳過: <b id="sum-skipped">0</b></span>
+        <span class="chip bad">失敗: <b id="sum-failed">0</b></span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>📋 執行紀錄</h2>
+      <div id="log"></div>
+    </section>
+
+    <section class="card">
+      <h2>📂 已下載檔案 (儲存資料夾)</h2>
+      <table>
+        <thead>
+          <tr><th>檔名</th><th>大小</th><th>修改時間</th></tr>
+        </thead>
+        <tbody id="dl-body"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "hactl-rcl",
+  "version": "0.1.0",
+  "private": true,
+  "description": "HACTL 貨站 RCL (Reception Cargo List) PDF 自動下載工具 - COSAC-Plus PAL",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "playwright": "^1.49.0"
+  }
+}

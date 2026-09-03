@@ -1,0 +1,21 @@
+# 執行產物
+node_modules/
+.browser-data/
+screenshots/
+
+# ⚠️ 機密: 唔好上傳
+# HACTL 帳號密碼
+data/config.json
+# DeepSeek API Key
+ds API.txt
+# 公司貨運 AWB / 查詢數據
+data/downloaded.json
+data/grid-dump*.json
+
+# 公司資料試算表
+*.xlsx
+
+# 個人筆記 (唔屬於呢個專案)
+deepseek Harness startup.txt
+
+
