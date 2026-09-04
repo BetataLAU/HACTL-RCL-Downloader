@@ -138,6 +138,57 @@
         <tbody id="dl-body"></tbody>
       </table>
     </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>🗂 資料管理</h2>
+        <div class="dl-toolbar">
+          <span id="mgmt-status" class="chip mute"></span>
+          <button id="btn-mgmt-refresh" class="btn secondary small" title="重新整理">🔄</button>
+        </div>
+      </div>
+
+      <div class="mgmt-block">
+        <div class="mgmt-head">
+          <span class="mgmt-title">📜 下載記錄
+            <span class="hint">(data/downloaded.json — 純歷史記錄, 刪除唔影響跳過邏輯)</span>
+          </span>
+          <span class="mgmt-actions">
+            <button id="btn-rec-clear-30d" class="btn secondary small" title="刪除超過 30 日前嘅下載記錄">刪除 30 日前</button>
+            <button id="btn-rec-clear-all" class="btn danger small" title="清空全部下載記錄">全部清空</button>
+          </span>
+        </div>
+        <div class="mgmt-scroll">
+          <table>
+            <thead>
+              <tr><th>#</th><th>MAWB#</th><th>下載時間</th><th class="mgmt-col-act"></th></tr>
+            </thead>
+            <tbody id="mgmt-rec-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="mgmt-block">
+        <div class="mgmt-head">
+          <span class="mgmt-title">📷 截圖
+            <span class="hint">(screenshots/ — 診斷用, 可隨時刪)</span>
+          </span>
+          <span class="mgmt-actions">
+            <button id="btn-shot-clear-7d" class="btn secondary small" title="刪除超過 7 日前嘅截圖資料夾">刪除 7 日前</button>
+            <button id="btn-shot-clear-all" class="btn danger small" title="清空全部截圖資料夾">全部清除</button>
+          </span>
+        </div>
+        <div id="mgmt-shot-summary" class="mgmt-summary"></div>
+        <div class="mgmt-scroll">
+          <table>
+            <thead>
+              <tr><th>執行日期</th><th>Run ID</th><th>檔案數</th><th>大小</th><th class="mgmt-col-act"></th></tr>
+            </thead>
+            <tbody id="mgmt-shot-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
   </main>
 
   <!-- PDF 頁內預覽 Drawer (唔離開頁面) -->
@@ -174,5 +225,6 @@
 
   <script src="app.js"></script>
   <script src="files.js"></script>
+  <script src="manage.js"></script>
 </body>
 </html>

@@ -4,7 +4,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { loadConfig, saveConfig } = require('./src/config');
+const { loadConfig, saveConfig, DATA_DIR } = require('./src/config');
 const { runAutomation } = require('./src/automation');
 const systemOpen = require('./src/system-open');
 
@@ -272,6 +272,170 @@ app.post('/api/open-file', async (req, res) => {
     return;
   }
   const r = await systemOpen.openFile(full);
+  res.json(r);
+});
+
+/* ---------------- 資料管理 (下載記錄 + 截圖) ---------------- */
+
+const RECORDS_FILE = path.join(DATA_DIR, 'downloaded.json');
+const SHOTS_DIR = path.join(__dirname, 'screenshots');
+
+function readRecords() {
+  try {
+    return JSON.parse(fs.readFileSync(RECORDS_FILE, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+function writeRecords(map) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(RECORDS_FILE, JSON.stringify(map, null, 2), 'utf8');
+}
+
+function listShotRuns() {
+  const out = [];
+  let totalFiles = 0;
+  let totalSize = 0;
+  let names = [];
+  try {
+    names = fs.readdirSync(SHOTS_DIR, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
+  } catch {
+    return { runs: out, totalFiles, totalSize };
+  }
+  for (const name of names) {
+    if (!/^\d+$/.test(name)) continue;
+    const dir = path.join(SHOTS_DIR, name);
+    let files = 0;
+    let size = 0;
+    try {
+      const list = fs.readdirSync(dir);
+      files = list.length;
+      for (const f of list) {
+        try {
+          size += fs.statSync(path.join(dir, f)).size;
+        } catch {}
+      }
+    } catch {
+      continue;
+    }
+    out.push({
+      id: name,
+      date: new Date(Number(name)).toISOString(),
+      files,
+      size,
+    });
+    totalFiles += files;
+    totalSize += size;
+  }
+  out.sort((a, b) => Number(b.id) - Number(a.id));
+  return { runs: out, totalFiles, totalSize };
+}
+
+/** 揀出要刪嘅 run 資料夾 (ids / olderThanDays / all); 正在執行嗰個 run 會自動排除 */
+function pickShotRunsToDelete(body) {
+  const all = listShotRuns().runs;
+  const currentId = running && currentRun ? String(currentRun.id) : null;
+  const now = Date.now();
+  const chosen = new Set();
+
+  const tryAdd = (r) => {
+    if (r.id === currentId) return false; // 唔好刪正在跑緊嗰個
+    chosen.add(r.id);
+    return true;
+  };
+
+  if (Array.isArray(body.ids)) {
+    for (const id of body.ids) {
+      const s = String(id || '').trim();
+      if (!/^\d+$/.test(s)) continue;
+      const r = all.find((x) => x.id === s);
+      if (r) tryAdd(r);
+    }
+  } else if (body.all) {
+    for (const r of all) tryAdd(r);
+  } else if (Number(body.olderThanDays) > 0) {
+    const cutoff = now - Number(body.olderThanDays) * 86400000;
+    for (const r of all) if (Number(r.id) < cutoff) tryAdd(r);
+  }
+  return Array.from(chosen);
+}
+
+app.get('/api/records', (req, res) => {
+  const map = readRecords();
+  const items = Object.keys(map)
+    .map((mawb) => ({ mawb, at: map[mawb] }))
+    .sort((a, b) => new Date(b.at) - new Date(a.at));
+  res.json({ ok: true, file: RECORDS_FILE, count: items.length, items });
+});
+
+app.post('/api/records/delete', (req, res) => {
+  if (!isLocalViewer(req, res)) return;
+  const body = req.body || {};
+  const targets = (Array.isArray(body.mawb) ? body.mawb : [body.mawb])
+    .map((m) => String(m || '').trim())
+    .filter(Boolean);
+  const map = readRecords();
+  const removed = [];
+  for (const t of targets) {
+    if (Object.prototype.hasOwnProperty.call(map, t)) {
+      delete map[t];
+      removed.push(t);
+    }
+  }
+  if (removed.length) writeRecords(map);
+  res.json({ ok: true, removed, remaining: Object.keys(map).length });
+});
+
+app.post('/api/records/clear', (req, res) => {
+  if (!isLocalViewer(req, res)) return;
+  const body = req.body || {};
+  const map = readRecords();
+  let removed = Object.keys(map);
+  const days = Math.max(0, Number(body.olderThanDays) || 0);
+  if (days > 0) {
+    const cutoff = Date.now() - days * 86400000;
+    removed = removed.filter((m) => new Date(map[m]).getTime() < cutoff);
+    for (const m of removed) delete map[m];
+  } else {
+    for (const m of removed) delete map[m];
+  }
+  if (removed.length) writeRecords(map);
+  res.json({ ok: true, removed, remaining: Object.keys(map).length });
+});
+
+app.get('/api/screenshots', (req, res) => {
+  const { runs, totalFiles, totalSize } = listShotRuns();
+  res.json({ ok: true, dir: SHOTS_DIR, count: runs.length, totalFiles, totalSize, runs });
+});
+
+app.post('/api/screenshots/delete', (req, res) => {
+  if (!isLocalViewer(req, res)) return;
+  const chosen = pickShotRunsToDelete(req.body || {});
+  const removed = [];
+  for (const id of chosen) {
+    const dir = path.join(SHOTS_DIR, id);
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+      removed.push(id);
+    } catch {}
+  }
+  res.json({ ok: true, removed, remaining: listShotRuns().runs.length });
+});
+
+app.post('/api/screenshots/open', async (req, res) => {
+  if (!isLocalViewer(req, res)) return;
+  const id = String((req.body && req.body.id) || '').trim();
+  if (!/^\d+$/.test(id)) {
+    res.status(400).json({ ok: false, error: '錯嘅 run id' });
+    return;
+  }
+  const dir = path.join(SHOTS_DIR, id);
+  if (!fs.existsSync(dir)) {
+    res.status(404).json({ ok: false, error: '搵唔到呢個截圖資料夾' });
+    return;
+  }
+  const r = await systemOpen.openFolder(dir);
   res.json(r);
 });
 

@@ -748,3 +748,56 @@ body.noscroll {
   font-weight: 700;
   box-shadow: inset 0 -1px 0 rgba(202, 138, 4, 0.25);
 }
+/* ============ 🗂 資料管理 (manage.js) ============ */
+
+.mgmt-block {
+  margin: 14px 0;
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.mgmt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.mgmt-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mgmt-title .hint {
+  font-weight: normal;
+}
+
+.mgmt-actions {
+  white-space: nowrap;
+}
+
+.mgmt-scroll {
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.mgmt-scroll td {
+  white-space: nowrap;
+}
+
+.mgmt-summary {
+  font-size: 12.5px;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.mgmt-col-act {
+  width: 120px;
+}
