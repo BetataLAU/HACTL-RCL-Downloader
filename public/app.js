@@ -30,6 +30,39 @@ function clearChips() {
   $('sum-failed').textContent = '0';
 }
 
+/* ---------------- 定時自動重查 (UI) ---------------- */
+
+let autoStateUI = { enabled: false, minutes: 0, nextAt: 0 };
+
+function pad2(n) {
+  return String(n).padStart(2, '0');
+}
+
+function updateAutoChip() {
+  const el = $('chip-auto');
+  if (!el) return;
+  if (!autoStateUI.enabled) {
+    el.textContent = '⏱ 自動重查: 關';
+    el.className = 'chip mute';
+    return;
+  }
+  let rest = '';
+  if (autoStateUI.nextAt) {
+    const ms = Math.max(0, autoStateUI.nextAt - Date.now());
+    rest = ' · 下次 ' + pad2(Math.floor(ms / 60000)) + ':' + pad2(Math.floor((ms % 60000) / 1000));
+  }
+  el.textContent = '⏱ 每 ' + autoStateUI.minutes + ' 分自動重查' + rest;
+  el.className = 'chip ok';
+}
+
+function applyAutoState(s) {
+  if (!s) return;
+  autoStateUI.enabled = !!s.enabled;
+  autoStateUI.minutes = Number(s.minutes) || 0;
+  autoStateUI.nextAt = Number(s.nextAt) || 0;
+  updateAutoChip();
+}
+
 /* ---------------- MAWB 格式處理 (同 server 端一致) ---------------- */
 
 function padLeft(s, n) {
@@ -262,6 +295,7 @@ async function loadConfig() {
     $('s-password').value = '';
     $('s-password').placeholder = c.hasPassword ? '已設定 (留空 = 不更改)' : '尚未設定';
     $('s-saveDir').value = c.saveDir || '';
+    $('s-autoCheck').value = c.autoCheckMinutes !== undefined ? String(c.autoCheckMinutes) : '0';
     $('s-airline').value = c.airline || '';
     $('s-showBrowser').checked = !c.headless;
     if (!$('r-acceptDate').value) $('r-acceptDate').value = todayDDMMMYY();
@@ -278,25 +312,8 @@ async function loadConfig() {
 }
 
 async function refreshDownloads() {
-  try {
-    const r = await fetch('/api/downloads');
-    const d = await r.json();
-    const tb = $('dl-body');
-    tb.innerHTML = '';
-    if (!d.files.length) {
-      tb.innerHTML = '<tr><td colspan="3">(尚未有 RCL 檔案)</td></tr>';
-      return;
-    }
-    for (const f of d.files) {
-      const tr = document.createElement('tr');
-      const size = f.size > 1024 ? (f.size / 1024).toFixed(1) + ' KB' : f.size + ' B';
-      const mt = new Date(f.mtime).toLocaleString('zh-HK');
-      tr.innerHTML = `<td>${f.name}</td><td>${size}</td><td>${mt}</td>`;
-      tb.appendChild(tr);
-    }
-  } catch {
-    /* ignore */
-  }
+  // 📂 已下載檔案 UI 已由 files.js 接管: 呢度淨係轉發事件, 由 files.js 重新整理
+  window.dispatchEvent(new CustomEvent('dl-refresh-requested'));
 }
 
 /** 即時 tick 返指定 MAWB 嘅 checkbox (成功下載後由 server 通知) */
@@ -324,12 +341,16 @@ function connectSSE() {
     } catch {
       return;
     }
-    if (msg.type === 'log') {
+    if (msg.type === 'hello') {
+      applyAutoState(msg.auto);
+    } else if (msg.type === 'auto-status') {
+      applyAutoState(msg);
+    } else if (msg.type === 'log') {
       logLine(msg.text, msg.level || 'info');
     } else if (msg.type === 'mawb-tick') {
       tickMawb(msg.mawb);
     } else if (msg.type === 'run-start') {
-      setStatus('執行中...', true);
+      setStatus(msg.run && msg.run.source === 'auto' ? '⏱ 自動執行中 (定時重查)...' : '執行中...', true);
       $('btn-run').disabled = true;
       $('btn-stop').disabled = false;
       clearChips();
@@ -364,6 +385,7 @@ $('btn-save-settings').addEventListener('click', async () => {
     username: $('s-username').value.trim(),
     password: $('s-password').value,
     saveDir: $('s-saveDir').value.trim(),
+    autoCheckMinutes: Math.max(0, Math.floor(Number($('s-autoCheck').value) || 0)),
     airline: $('s-airline').value.trim(),
     headless: !$('s-showBrowser').checked,
     mawbList: collectMawbList(),
@@ -517,4 +539,6 @@ $('btn-stop').addEventListener('click', async () => {
 loadConfig();
 connectSSE();
 refreshDownloads();
+updateAutoChip();
 setInterval(refreshDownloads, 15000);
+setInterval(updateAutoChip, 1000);

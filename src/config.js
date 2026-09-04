@@ -15,6 +15,7 @@ const DEFAULTS = {
   airline: 'QR',
   acceptDate: 'auto',
   acceptDateTo: 'auto',
+  autoCheckMinutes: 0,
   saveDir: path.join(os.homedir(), 'Downloads'),
   headless: false,
   slowMo: 0,

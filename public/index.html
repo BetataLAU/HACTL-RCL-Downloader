@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>HACTL RCL 自動下載 (PAL)</title>
+  <link rel="icon" href="data:,">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -26,10 +27,13 @@
           <input id="s-password" type="password" autocomplete="new-password" placeholder="尚未設定">
         </label>
         <label>儲存資料夾
-          <input id="s-saveDir" type="text" placeholder="C:\Users\...\Downloads">
+          <input id="s-saveDir" type="text" placeholder="下載資料夾">
         </label>
         <label>預設航空公司
           <input id="s-airline" type="text" size="4" placeholder="QR">
+        </label>
+        <label>自動重查間隔 (分鐘)
+          <input id="s-autoCheck" type="number" min="0" max="10080" step="1" placeholder="0 = 關閉" title="每次執行完成後, 每隔 N 分鐘自動再查一次今日嘅 RCL; 0 = 關閉">
         </label>
         <label class="check">
           <input id="s-showBrowser" type="checkbox"> 顯示瀏覽器視窗 (可看到自動化過程)
@@ -78,6 +82,7 @@
         <span class="chip ok">已下載: <b id="sum-downloaded">0</b></span>
         <span class="chip mute">已跳過: <b id="sum-skipped">0</b></span>
         <span class="chip bad">失敗: <b id="sum-failed">0</b></span>
+        <span class="chip mute" id="chip-auto" title="定時自動重查: 喺「設定」度改分鐘數, 0 = 關閉">⏱ 自動重查: 讀取中…</span>
       </div>
     </section>
 
@@ -87,16 +92,87 @@
     </section>
 
     <section class="card">
-      <h2>📂 已下載檔案 (儲存資料夾)</h2>
+      <div class="card-head">
+        <h2>📂 已下載檔案</h2>
+        <div class="dl-toolbar">
+          <span id="dl-platform" class="chip mute" title="Server 平台"></span>
+          <span id="dl-mode" class="chip mute" title="你而家點樣連線"></span>
+          <button id="btn-dl-folder" class="btn secondary small local-only" title="喺系統檔案管理員開啟儲存資料夾">📂 開啟資料夾</button>
+          <button id="btn-dl-refresh" class="btn secondary small" title="重新整理">🔄</button>
+        </div>
+      </div>
+
+      <div class="dl-locbar" id="dl-locbar">
+        <span class="dl-loc-icon">📁</span>
+        <code id="dl-dir" class="dl-dir" title="按一下複製路徑"></code>
+        <span id="dl-dircopy" class="dl-copied hidden">已複製 ✓</span>
+      </div>
+
+      <div class="dl-tools">
+        <input id="dl-filter" type="text" autocomplete="off" placeholder="🔍 搜尋 MAWB / 檔名 (自動忽略空格-橫線、支援片段)…  Ctrl+K">
+        <select id="dl-sort" title="排列 / 分組">
+          <option value="time">最新優先</option>
+          <option value="name">檔名排列</option>
+          <option value="groups">分組 (今日 / 今週 / 較早)</option>
+        </select>
+        <span id="dl-count" class="hint"></span>
+      </div>
+
+      <div id="dl-batch" class="dl-batch hidden">
+        <span>已選 <b id="dl-batch-n">0</b> 份</span>
+        <button id="btn-batch-download" class="btn secondary small">⬇ 批次下載</button>
+        <button id="btn-batch-preview" class="btn secondary small">🔍 預覽第一份</button>
+        <button id="btn-batch-clear" class="btn secondary small">✕ 清除</button>
+      </div>
+
       <table>
         <thead>
-          <tr><th>檔名</th><th>大小</th><th>修改時間</th></tr>
+          <tr>
+            <th class="col-dl-check"><input id="dl-check-all" type="checkbox" title="全選 (只限搜尋結果)"></th>
+            <th>檔名</th>
+            <th class="col-dl-size">大小</th>
+            <th class="col-dl-mtime">修改時間</th>
+            <th class="col-dl-actions">操作</th>
+          </tr>
         </thead>
         <tbody id="dl-body"></tbody>
       </table>
     </section>
   </main>
 
+  <!-- PDF 頁內預覽 Drawer (唔離開頁面) -->
+  <div id="dl-drawer" class="dl-drawer">
+    <div class="dl-drawer-bar">
+      <code id="dl-drawer-name" class="dl-drawer-name"></code>
+      <div class="dl-drawer-btns">
+        <button class="btn secondary small" id="btn-drawer-newtab" title="喺新分頁開">↗</button>
+        <button class="btn secondary small" id="btn-drawer-download" title="下載">⬇</button>
+        <button class="btn secondary small local-only" id="btn-drawer-os" title="用系統預設應用程式開啟">🖥️</button>
+        <button class="btn secondary small" id="btn-drawer-close" title="關閉 (Esc)">✕</button>
+      </div>
+    </div>
+    <iframe id="dl-drawer-frame" title="PDF 預覽"></iframe>
+  </div>
+
+  <!-- Quick Look: 懸停縮圖 -->
+  <div id="dl-quicklook" class="dl-quicklook hidden">
+    <img id="dl-quicklook-img" alt="PDF 第一頁縮圖">
+    <span id="dl-quicklook-tip" class="dl-quicklook-tip">按一下檔名亦可預覽</span>
+  </div>
+
+  <!-- Toast 通知 -->
+  <div id="toasts" class="toasts"></div>
+
+  <!-- Command Palette -->
+  <div id="palette" class="palette hidden">
+    <div class="palette-box">
+      <input id="palette-input" type="text" autocomplete="off" placeholder="輸入 MAWB / 檔名搜尋檔案, Enter 預覽">
+      <div id="palette-list"></div>
+      <div class="palette-foot">↑↓ 選擇　Enter 預覽　Esc 關閉</div>
+    </div>
+  </div>
+
   <script src="app.js"></script>
+  <script src="files.js"></script>
 </body>
 </html>
