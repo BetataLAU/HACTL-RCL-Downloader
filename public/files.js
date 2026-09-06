@@ -481,7 +481,13 @@
     const resp = await fetch(fileUrl(name, false));
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.arrayBuffer();
-    const doc = await pdfjs.getDocument({ data }).promise;
+    const doc = await pdfjs.getDocument({
+      data,
+      // RCL PDF 用標準 14 字型 (Helvetica 等, 無嵌入) → 一定要畀字型/CMap 位置先渲染到
+      standardFontDataUrl: '/vendor/pdfjs-standard-fonts/',
+      cMapUrl: '/vendor/pdfjs-cmaps/',
+      cMapPacked: true,
+    }).promise;
     try {
       const page = await doc.getPage(1);
       const vp1 = page.getViewport({ scale: 1 });

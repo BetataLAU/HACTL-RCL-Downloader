@@ -801,3 +801,21 @@ body.noscroll {
 .mgmt-col-act {
   width: 120px;
 }
+
+/* ---------- 🗂 資料管理: 收納卡片 ---------- */
+
+#card-mgmt.collapsed #mgmt-body {
+  display: none;
+}
+
+.mgmt-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+
+.mgmt-toggle .mgmt-chevron {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 13px;
+  color: #6b7280;
+}

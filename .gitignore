@@ -3,6 +3,8 @@ node_modules/
 .browser-data/
 screenshots/
 
+# 執行期間產生嘅數據/設定檔 (config.json 有密碼、profiles 有公司 MAWB、dom-inspect 有貨運資料)
+data/
 # ⚠️ 機密: 唔好上傳
 # HACTL 帳號密碼
 data/config.json

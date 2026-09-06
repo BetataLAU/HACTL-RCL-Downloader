@@ -6,14 +6,12 @@
   <title>HACTL RCL 自動下載 (PAL)</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="xls.css">
 </head>
 <body>
   <header>
     <h1>✈ HACTL RCL 自動下載 (PAL)</h1>
-    <div class="status">
-      <span id="status-dot" class="dot idle"></span>
-      <span id="status-text">閒置</span>
-    </div>
+    <div id="profile-switch" class="profile-switch" title="揀人用邊套個人設定 (Airline / 儲存夾 / MAWB 清單 / XLS)"></div>
   </header>
 
   <main>
@@ -82,12 +80,51 @@
         <span class="chip ok">已下載: <b id="sum-downloaded">0</b></span>
         <span class="chip mute">已跳過: <b id="sum-skipped">0</b></span>
         <span class="chip bad">失敗: <b id="sum-failed">0</b></span>
-        <span class="chip mute" id="chip-auto" title="定時自動重查: 喺「設定」度改分鐘數, 0 = 關閉">⏱ 自動重查: 讀取中…</span>
+        <span class="chip mute" id="chip-auto" title="定時自動重查: 喺「設定」度改分鐘數; MAWB 清單全部已下載時會自動暫停">⏱ 自動重查: 讀取中…</span>
       </div>
     </section>
 
+    <section class="card liu-only" id="card-xls" hidden>
+      <h2>📊 XLS 同步 (劉鏘鏘)</h2>
+      <div class="xls-hint">DL RCL 嘅同時自動更新 HC HIN LISTING (只改 11 位 MAWB 資料行; 差異會寫入 remark + 下面通知)</div>
+      <div class="grid">
+        <label class="wide">XLS 檔案
+          <input id="xls-file" type="text" placeholder="按「揀檔案」上傳, 或貼路徑">
+        </label>
+        <label>Worksheet
+          <select id="xls-sheet"></select>
+        </label>
+        <label class="check">
+          <input id="xls-enabled" type="checkbox"> 啟用同步 (DL RCL 後自動更新 XLS)
+        </label>
+      </div>
+      <div class="xls-actions">
+        <button id="btn-xls-upload" class="btn secondary small">📁 揀/拖 XLS 檔案</button>
+        <input id="xls-file-input" type="file" accept=".xlsx,.xls" hidden>
+        <button id="btn-xls-check" class="btn secondary small">🔍 檢查</button>
+        <button id="btn-xls-save" class="btn secondary small">儲存設定</button>
+        <span id="xls-msg"></span>
+      </div>
+      <div id="xls-info" class="xls-info"></div>
+      <div id="xls-issues-wrap" class="xls-issues" hidden>
+        <h3>⚠ 差異 / 通知</h3>
+        <div id="xls-issues"></div>
+      </div>
+    </section>
+
+    <section class="card hin-only" id="card-hin" hidden>
+      <h2>🚧 軒仔</h2>
+      <div class="xls-hint">有待建設</div>
+    </section>
+
     <section class="card">
-      <h2>📋 執行紀錄</h2>
+      <div class="card-head">
+        <h2>📋 執行紀錄</h2>
+        <div class="status" title="執行狀態">
+          <span id="status-dot" class="dot idle"></span>
+          <span id="status-text">閒置</span>
+        </div>
+      </div>
       <div id="log"></div>
     </section>
 
@@ -139,14 +176,16 @@
       </table>
     </section>
 
-    <section class="card">
-      <div class="card-head">
-        <h2>🗂 資料管理</h2>
+    <section class="card collapsed" id="card-mgmt">
+      <div class="card-head mgmt-toggle" id="mgmt-toggle" title="撳一下展開 / 收納">
+        <h2>🗂 資料管理<span class="mgmt-chevron" id="mgmt-chevron">▸</span></h2>
         <div class="dl-toolbar">
           <span id="mgmt-status" class="chip mute"></span>
           <button id="btn-mgmt-refresh" class="btn secondary small" title="重新整理">🔄</button>
         </div>
       </div>
+
+      <div id="mgmt-body">
 
       <div class="mgmt-block">
         <div class="mgmt-head">
@@ -188,6 +227,7 @@
           </table>
         </div>
       </div>
+      </div>
     </section>
   </main>
 
@@ -226,5 +266,6 @@
   <script src="app.js"></script>
   <script src="files.js"></script>
   <script src="manage.js"></script>
+  <script src="xls.js"></script>
 </body>
 </html>

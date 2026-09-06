@@ -207,6 +207,33 @@
     loadShots();
   });
 
+  /* ---------------- 🗂 資料管理: 收納 / 展開 ---------------- */
+
+  const mgmtCard = el('card-mgmt');
+  const mgmtChevron = el('mgmt-chevron');
+
+  function isMgmtOpen() {
+    return !mgmtCard || !mgmtCard.classList.contains('collapsed');
+  }
+
+  function setMgmtOpen(open) {
+    if (!mgmtCard) return;
+    mgmtCard.classList.toggle('collapsed', !open);
+    if (mgmtChevron) mgmtChevron.textContent = open ? '▾' : '▸';
+  }
+
+  const mgmtToggle = el('mgmt-toggle');
+  if (mgmtToggle) {
+    mgmtToggle.addEventListener('click', (e) => {
+      // 撳到 🔄 按鈕就唔當開合 (交畀 refresh 本身)
+      if (e.target.closest('button')) return;
+      const open = !isMgmtOpen();
+      setMgmtOpen(open);
+      if (open) refreshAll(true); // 展開嗰刻順手更新一次
+    });
+  }
+  setMgmtOpen(false); // 預設收納 (同步箭嘴 ▸)
+
   /* run 完成 (狀態由 running 變返閒置) 後順手更新一次 */
   let wasRunning = null;
   setInterval(async () => {

@@ -124,3 +124,23 @@ node server.js
 - 「執行下載」卡有即時狀態 chip: `⏱ 每 10 分自動重查 · 下次 09:58` (每秒倒數)。
 - 自動執行緊時, 頁頂狀態會顯示「⏱ 自動執行中 (定時重查)」; 撳「停止」只停當次。
 - 設 0 或清空 = 關閉。Server 重啟後會沿用上次設定 (存喺 `data/config.json` 嘅 `autoCheckMinutes`)。
+- **自動暫停**: MAWB 清單非空而全部 tick (skip) → 已無嘢可下載, 自動重查會自動暫停 (唔會再每 N 分鐘登入), chip 顯示「⏸ 已暫停 (全部已下載)」。取消任何 tick / 加新 MAWB / 清空清單後, 再按「開始下載」或「儲存設定」即自動重啟。
+- 如果想「全日自動捉新出現嘅 RCL」: 將 MAWB 清單**清空** (空清單 = 下載嗰日全部新 Type P/B, 已存在自動跳過), 咁自動重查先會捉到清單以外嘅新 MAWB。
+
+### 👤 個人切換 (軒仔 / 劉鏘鏘, v0.3+)
+
+- 頁頂有「軒仔 | 劉鏘鏘」pill;每人有獨立設定 (Airline / 儲存資料夾 / MAWB 清單 / XLS 同步),
+  存放喺 `data/profiles/<id>.json`;HACTL 帳密共用存喺 `data/config.json`。
+- 切換 = 成套設定換人 (網頁會自動 reload)。
+
+### 📊 劉鏘鏘: DL RCL 同時自動更新 XLS (v0.3+)
+
+- 「XLS 同步」卡:揀/拖 `HC HIN LISTING.xlsx`(預設建議 = project root 嗰份),揀 worksheet(預設最左張=當月)。
+- 每次執行完成後,會將下載到嘅 RCL 抽返數值 (詳細頁 DOM → 唔夠先由 RCL PDF fallback),自動:
+  - 只改「A 欄 = 11 位數字」嘅資料行,block header / `.` / `TOTAL n MAWB` 行一律唔郁;
+  - DEST 核對 / PCS (P 跟 XLS, B/X 跟 RCL) / WT 跟 RCL (>5% 通知) / CBM 只 B / TYPE 核對 /
+    ULD#・Contour・Tare 空白先填 / remark LIH=N 填 `no LIH` / accept? 下載成功填 1;
+  - 差異會寫入該行 remark (例 `WT>5%`) 並喺頁面「⚠ 差異通知」列出;
+  - Type X (mix-load):同一 MAWB 喺唔同 ULD RCL 出現時,會喺原 MAWB 行下面自動插新行;
+  - 寫入前自動備份去 `<xls 所在資料夾>/.hactl-backup/`;Excel 開住個檔會提示關閉後再補寫。
+- 測試:`npm test`

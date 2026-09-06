@@ -4,9 +4,12 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const { loadConfig, saveConfig, DATA_DIR } = require('./src/config');
+const { loadConfig, saveConfig, DATA_DIR, getProfilesMeta } = require('./src/config');
 const { runAutomation } = require('./src/automation');
 const systemOpen = require('./src/system-open');
+const { syncRunToXls } = require('./src/xls-run');
+const profileApi = require('./src/routes-profile');
+const xlsApi = require('./src/routes-xls');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3090;
@@ -18,6 +21,14 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 /* pdf.js 靜態供應 (Quick Look 縮圖用; offline 都得) */
 app.use('/vendor/pdfjs', express.static(path.join(__dirname, 'node_modules', 'pdfjs-dist', 'build')));
+/* pdf.js 標準 14 字型 (.pfb) + CMaps: 呢啲 PDF 用標準字型而非嵌入, 唔供應會出
+   "UnknownErrorException: Ensure that the standardFontDataUrl API parameter is provided" */
+app.use('/vendor/pdfjs-standard-fonts', express.static(path.join(__dirname, 'node_modules', 'pdfjs-dist', 'standard_fonts')));
+app.use('/vendor/pdfjs-cmaps', express.static(path.join(__dirname, 'node_modules', 'pdfjs-dist', 'cmaps')));
+
+/* 個人 profile + XLS 同步 API (抽咗出嚟做 router, 避免 server.js 繼續肥大) */
+app.use('/api', profileApi);
+app.use('/api', xlsApi);
 
 /* ---------------- helpers ---------------- */
 
@@ -61,6 +72,7 @@ let autoTimer = null;           // setTimeout handle
 let autoNextAt = 0;             // 下次自動執行嘅 timestamp (ms)
 let autoRunSeq = 0;             // 自動重查次數 (log 用)
 let lastAutoAirline = null;     // 最後用嘅 airline, 自動重查沿用
+let autoPauseNotified = false;  // 已就「全部已下載 → 暫停」出過 log (避免重複)
 
 function broadcast(msg) {
   const s = JSON.stringify(msg);
@@ -73,10 +85,26 @@ function broadcast(msg) {
 
 /* ---------- 定時自動重查: 排程 / 廣播 ---------- */
 
+/** MAWB 清單非空, 而且全部已 tick (skip) → 冇嘢可以自動下載, 自動重查應暫停
+ *  注意: 清空清單 (length 0) 唔算全部完成 → 空清單 = 下載全部新 P/B, 自動重查照跑先有用 */
+function mawbAllDone() {
+  const cfg = loadConfig();
+  const list = (Array.isArray(cfg.mawbList) ? cfg.mawbList : []).filter(
+    (m) => m && String((m && m.value) || '').trim()
+  );
+  return list.length > 0 && list.every((m) => !!m.skip);
+}
+
 function currentAutoState() {
   const cfg = loadConfig();
   const minutes = Math.max(0, Math.floor(Number(cfg.autoCheckMinutes) || 0));
-  return { enabled: minutes > 0, minutes, nextAt: minutes > 0 && autoNextAt > 0 ? autoNextAt : 0 };
+  const paused = minutes > 0 && mawbAllDone();
+  return {
+    enabled: minutes > 0,
+    minutes,
+    nextAt: minutes > 0 && !paused && autoNextAt > 0 ? autoNextAt : 0,
+    pausedAllTicked: paused,
+  };
 }
 
 function broadcastAuto() {
@@ -92,7 +120,18 @@ function scheduleAutoCheck() {
   autoNextAt = 0;
   const cfg = loadConfig();
   const minutes = Math.max(0, Math.floor(Number(cfg.autoCheckMinutes) || 0));
-  if (minutes > 0) {
+  const paused = minutes > 0 && mawbAllDone();
+  if (paused && !autoPauseNotified) {
+    autoPauseNotified = true;
+    broadcast({
+      type: 'log',
+      ts: new Date().toISOString(),
+      level: 'info',
+      text: '⏸ 自動重查暫停: MAWB 清單已全部標記已下載 (取消任何 tick / 加新 MAWB / 清空清單, 再按開始下載或儲存設定就會自動重啟)',
+    });
+  }
+  if (!paused) autoPauseNotified = false;
+  if (minutes > 0 && !paused) {
     autoNextAt = Date.now() + minutes * 60 * 1000;
     autoTimer = setTimeout(() => { autoTimer = null; onAutoCheck(); }, minutes * 60 * 1000);
     if (autoTimer.unref) autoTimer.unref(); // 唔阻斷正常關 server
@@ -105,6 +144,11 @@ function onAutoCheck() {
   const cfg = loadConfig();
   const minutes = Math.max(0, Math.floor(Number(cfg.autoCheckMinutes) || 0));
   if (minutes <= 0) { scheduleAutoCheck(); return; }
+  if (mawbAllDone()) {
+    // 等待期間用戶可能經 UI 改到全部 tick 晒 (config 已更新) → 唔執行, 直接暫停
+    scheduleAutoCheck();
+    return;
+  }
   if (running) {
     // 而家執行緊 → 5 秒後再睇, 唔重疊執行
     autoNextAt = Date.now() + 5000;
@@ -154,6 +198,9 @@ app.get('/api/config', (req, res) => {
     browserChannel: cfg.browserChannel,
     maxRclRows: cfg.maxRclRows,
     mawbList: cfg.mawbList,
+    activeProfile: cfg.activeProfile || 'hin',
+    profiles: getProfilesMeta().map((p) => ({ id: p.id, name: p.name })),
+    xlsSync: cfg.xlsSync || null,
   });
 });
 
@@ -161,7 +208,7 @@ app.post('/api/config', (req, res) => {
   const body = req.body || {};
   const cur = loadConfig();
   const patch = {};
-  for (const k of ['baseUrl', 'username', 'airline', 'acceptDate', 'acceptDateTo', 'saveDir', 'headless', 'browserChannel', 'maxRclRows', 'profileName', 'mawbList']) {
+  for (const k of ['baseUrl', 'username', 'airline', 'acceptDate', 'acceptDateTo', 'saveDir', 'headless', 'browserChannel', 'maxRclRows', 'profileName', 'mawbList', 'xlsSync']) {
     if (body[k] !== undefined) patch[k] = body[k];
   }
   if (body.autoCheckMinutes !== undefined) {
@@ -462,12 +509,15 @@ async function executeRun(acceptDateOverride, airlineOverride, acceptDateToOverr
   stopRequested = false;
   broadcast({ type: 'run-start', run: { id: run.id, startedAt: run.startedAt, source: run.source } });
 
+  // executeRun 共用 logger: runAutomation hooks 同之後嘅 XLS 同步都用佢 (寫入 run.logs + SSE 廣播)
+  const log = (text, level = 'info') => {
+    const entry = { type: 'log', ts: new Date().toISOString(), level, text: String(text) };
+    run.logs.push(entry);
+    broadcast(entry);
+  };
+
   const result = await runAutomation(cfg, {
-    log: (text, level = 'info') => {
-      const entry = { type: 'log', ts: new Date().toISOString(), level, text: String(text) };
-      run.logs.push(entry);
-      broadcast(entry);
-    },
+    log,
     screenshot: async (page, name) => {
       try {
         const dir = path.join(__dirname, 'screenshots', String(run.id));
@@ -505,6 +555,28 @@ async function executeRun(acceptDateOverride, airlineOverride, acceptDateToOverr
       return m;
     });
     if (changed) saveConfig({ mawbList: cfg.mawbList });
+  }
+
+  /* XLS 同步 (劉鏘鏘: DL RCL 後自動更新 HC HIN LISTING) */
+  if (cfg.xlsSync && cfg.xlsSync.enabled) {
+    log('── 開始 XLS 同步 ──');
+    try {
+      const xout = await syncRunToXls(cfg, result, log);
+      broadcast({
+        type: 'xls-summary',
+        out: {
+          ok: !!xout.ok,
+          error: xout.error || null,
+          issues: (xout.issues || []).slice(0, 200),
+          rowsUpdated: xout.rowsUpdated || 0,
+          rowsInserted: xout.rowsInserted || 0,
+          skippedNoRecords: !!xout.skippedNoRecords,
+          unchanged: !!xout.unchanged,
+        },
+      });
+    } catch (e) {
+      log('XLS 同步出錯: ' + e.message, 'error');
+    }
   }
 
   running = false;

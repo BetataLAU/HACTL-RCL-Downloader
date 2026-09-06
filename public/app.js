@@ -32,7 +32,7 @@ function clearChips() {
 
 /* ---------------- 定時自動重查 (UI) ---------------- */
 
-let autoStateUI = { enabled: false, minutes: 0, nextAt: 0 };
+let autoStateUI = { enabled: false, minutes: 0, nextAt: 0, pausedAllTicked: false };
 
 function pad2(n) {
   return String(n).padStart(2, '0');
@@ -44,6 +44,13 @@ function updateAutoChip() {
   if (!autoStateUI.enabled) {
     el.textContent = '⏱ 自動重查: 關';
     el.className = 'chip mute';
+    el.title = '定時自動重查: 喺「設定」度改分鐘數, 0 = 關閉';
+    return;
+  }
+  if (autoStateUI.pausedAllTicked) {
+    el.textContent = '⏸ 自動重查: 已暫停 (全部已下載)';
+    el.className = 'chip mute';
+    el.title = 'MAWB 清單已全部 tick (已下載 RCL)。取消任何 tick / 加新 MAWB / 清空清單, 再按「開始下載」或「儲存設定」即會自動重啟。';
     return;
   }
   let rest = '';
@@ -53,6 +60,7 @@ function updateAutoChip() {
   }
   el.textContent = '⏱ 每 ' + autoStateUI.minutes + ' 分自動重查' + rest;
   el.className = 'chip ok';
+  el.title = '定時自動重查: 喺「設定」度改分鐘數; MAWB 清單全部已下載時會自動暫停';
 }
 
 function applyAutoState(s) {
@@ -60,6 +68,7 @@ function applyAutoState(s) {
   autoStateUI.enabled = !!s.enabled;
   autoStateUI.minutes = Number(s.minutes) || 0;
   autoStateUI.nextAt = Number(s.nextAt) || 0;
+  autoStateUI.pausedAllTicked = !!s.pausedAllTicked;
   updateAutoChip();
 }
 
